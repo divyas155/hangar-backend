@@ -1,37 +1,46 @@
-const fs   = require('fs');
+const fs = require('fs');
 const path = require('path');
 const { google } = require('googleapis');
 
-const CREDENTIALS_PATH = path.join(__dirname, '../credentials.json');
-const TOKEN_PATH       = path.join(__dirname, '../token.json');
+let CREDENTIALS, TOKEN;
 
-if (!fs.existsSync(CREDENTIALS_PATH) || !fs.existsSync(TOKEN_PATH)) {
-  throw new Error('Missing credentials.json or token.json');
+try {
+  CREDENTIALS = JSON.parse(process.env.GOOGLE_CREDENTIALS);
+  TOKEN = JSON.parse(process.env.GOOGLE_TOKEN);
+} catch (err) {
+  throw new Error('❌ Missing or invalid GOOGLE_CREDENTIALS or GOOGLE_TOKEN environment variables.');
 }
 
-const { client_id, client_secret, redirect_uris } = JSON.parse(fs.readFileSync(CREDENTIALS_PATH)).web;
-const { refresh_token } = JSON.parse(fs.readFileSync(TOKEN_PATH));
+// Get auth fields
+const { client_id, client_secret, redirect_uris } =
+  CREDENTIALS.installed || CREDENTIALS.web; // support both formats
 
-const oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
-// Only set the refresh token:
+const { refresh_token } = TOKEN;
+
+// Initialize OAuth2 client
+const oAuth2Client = new google.auth.OAuth2(
+  client_id,
+  client_secret,
+  redirect_uris[0]
+);
+
+// Set token
 oAuth2Client.setCredentials({ refresh_token });
 
+// Set up Google Drive API
 const drive = google.drive({ version: 'v3', auth: oAuth2Client });
 
+// Upload file to Drive
 async function uploadFile(localFilePath, remoteFileName, mimeType) {
   const res = await drive.files.create({
     requestBody: { name: remoteFileName, mimeType },
-    media:       { mimeType, body: fs.createReadStream(localFilePath) },
-    fields:      'id,webViewLink'
+    media: { mimeType, body: fs.createReadStream(localFilePath) },
+    fields: 'id,webViewLink',
   });
   return res.data;
 }
 
-/**
- * Streams a file’s contents from Drive.
- * @param {string} fileId
- * @returns {ReadableStream}
- */
+// Stream file from Drive
 async function getDriveFileStream(fileId) {
   const res = await drive.files.get(
     { fileId, alt: 'media' },
@@ -42,5 +51,5 @@ async function getDriveFileStream(fileId) {
 
 module.exports = {
   uploadFile,
-  getDriveFileStream
+  getDriveFileStream,
 };
