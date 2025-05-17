@@ -3,32 +3,27 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
 /**
- * Authentication middleware:
+ * ✅ Authentication middleware:
  * - Extracts Bearer token from Authorization header
- * - Verifies it and loads the active user into req.user
+ * - Verifies JWT
+ * - Attaches active user to req.user
  */
 const auth = async (req, res, next) => {
-  // Get the Authorization header
   const authHeader = req.get('Authorization') || '';
-  const token = authHeader.startsWith('Bearer ')
-    ? authHeader.slice(7)
-    : null;
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
 
   if (!token) {
     return res.status(401).json({ message: 'Authentication required' });
   }
 
   try {
-    // Verify JWT and extract userId
     const { userId } = jwt.verify(token, process.env.JWT_SECRET);
-    // Find active user
-    const user = await User.findById(userId).where({ isActive: true }).exec();
 
+    const user = await User.findById(userId).where({ isActive: true }).exec();
     if (!user) {
       return res.status(401).json({ message: 'User not found or inactive' });
     }
 
-    // Attach user to request and proceed
     req.user = user;
     next();
   } catch (error) {
@@ -37,8 +32,8 @@ const auth = async (req, res, next) => {
 };
 
 /**
- * Role-based access control middleware generator.
- * @param {string[]} roles – list of allowed roles
+ * ✅ Role-based access middleware generator
+ * @param {string[]} roles – array of allowed roles
  */
 const checkRole = (roles) => {
   return (req, res, next) => {
@@ -49,13 +44,13 @@ const checkRole = (roles) => {
   };
 };
 
-// ✅ Role aliases
+// ✅ Role shortcuts
 const isAdmin           = checkRole(['admin']);
 const isSiteEngineer    = checkRole(['site_engineer']);
 const isPayingAuthority = checkRole(['paying_authority']);
 const isViewer          = checkRole(['viewer']);
 
-// ✅ Export all middleware functions
+// ✅ Exports
 module.exports = {
   auth,
   checkRole,

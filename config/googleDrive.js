@@ -1,55 +1,114 @@
+require('dotenv').config(); // ✅ Load environment variables first
 const fs = require('fs');
-const path = require('path');
 const { google } = require('googleapis');
 
-let CREDENTIALS, TOKEN;
+// 🔐 Initialize Drive client using service account credentials
+let drive = null;
 
 try {
-  CREDENTIALS = JSON.parse(process.env.GOOGLE_CREDENTIALS);
-  TOKEN = JSON.parse(process.env.GOOGLE_TOKEN);
-} catch (err) {
-  throw new Error('❌ Missing or invalid GOOGLE_CREDENTIALS or GOOGLE_TOKEN environment variables.');
+  const serviceAccountPath = process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH;
+
+  if (!serviceAccountPath || !fs.existsSync(serviceAccountPath)) {
+    throw new Error('❌ Missing or invalid GOOGLE_SERVICE_ACCOUNT_KEY_PATH.');
+  }
+
+  const auth = new google.auth.GoogleAuth({
+    keyFile: serviceAccountPath,
+    scopes: ['https://www.googleapis.com/auth/drive'],
+  });
+
+  drive = google.drive({ version: 'v3', auth });
+  console.log('✅ Google Drive client initialized using service account.');
+} catch (error) {
+  console.error('⚠️ Google Drive setup failed:', error.message);
+  drive = null;
 }
 
-// Get auth fields
-const { client_id, client_secret, redirect_uris } =
-  CREDENTIALS.installed || CREDENTIALS.web; // support both formats
+// ✅ Default shared folder for ZIP uploads
+const FIXED_FOLDER_ID = '1QFXvk45MCVe1ozlFjBOMRr_Y7y4HIqU_';
 
-const { refresh_token } = TOKEN;
-
-// Initialize OAuth2 client
-const oAuth2Client = new google.auth.OAuth2(
-  client_id,
-  client_secret,
-  redirect_uris[0]
-);
-
-// Set token
-oAuth2Client.setCredentials({ refresh_token });
-
-// Set up Google Drive API
-const drive = google.drive({ version: 'v3', auth: oAuth2Client });
-
-// Upload file to Drive
+// 📤 Upload ZIP file to shared ZIP folder (original logic unchanged)
 async function uploadFile(localFilePath, remoteFileName, mimeType) {
+  if (!drive) throw new Error('❌ Google Drive client not initialized.');
+
   const res = await drive.files.create({
-    requestBody: { name: remoteFileName, mimeType },
-    media: { mimeType, body: fs.createReadStream(localFilePath) },
-    fields: 'id,webViewLink',
+    requestBody: {
+      name: remoteFileName,
+      mimeType,
+      parents: [FIXED_FOLDER_ID],
+    },
+    media: {
+      mimeType,
+      body: fs.createReadStream(localFilePath),
+    },
+    fields: 'id, webViewLink',
   });
+
   return res.data;
 }
 
-// Stream file from Drive
+// 📤 Upload admin files (PDF, DOCX, TXT, etc.) to a separate Drive folder
+async function uploadAdminFile(localFilePath, remoteFileName, mimeType, folderId) {
+  if (!drive) throw new Error('❌ Google Drive client not initialized.');
+
+  const res = await drive.files.create({
+    requestBody: {
+      name: remoteFileName,
+      mimeType,
+      parents: [folderId], // 📁 uploads to Admin folder
+    },
+    media: {
+      mimeType,
+      body: fs.createReadStream(localFilePath),
+    },
+    fields: 'id, name, webViewLink',
+  });
+
+  const fileId = res.data.id;
+
+  // 🔓 Make the uploaded file publicly downloadable
+  await drive.permissions.create({
+    fileId,
+    requestBody: {
+      role: 'reader',
+      type: 'anyone',
+    },
+  });
+
+  return {
+    driveId: fileId,
+    name: res.data.name,
+    webViewLink: res.data.webViewLink,
+    downloadUrl: `https://drive.google.com/uc?id=${fileId}&export=download`,
+  };
+}
+
+// 📥 Stream/download file from Drive
 async function getDriveFileStream(fileId) {
+  if (!drive) throw new Error('❌ Google Drive client not initialized.');
+
   const res = await drive.files.get(
     { fileId, alt: 'media' },
     { responseType: 'stream' }
   );
-  return res.data; // Node.js Readable stream
+
+  return res.data;
 }
+// 🗑️ Delete file from Google Drive by file ID
+async function deleteDriveFile(fileId) {
+  if (!drive) throw new Error('❌ Google Drive client not initialized.');
+  try {
+    await drive.files.delete({ fileId });
+    return true;
+  } catch (error) {
+    throw new Error(`Drive deletion failed: ${error.message}`);
+  }
+}
+
 
 module.exports = {
   uploadFile,
+  uploadAdminFile,
   getDriveFileStream,
+  deleteDriveFile, // ✅ include it here
 };

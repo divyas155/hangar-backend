@@ -1,30 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
-const passport = require('passport');
 const User = require('../models/User');
 const { auth, isAdmin } = require('../middleware/auth');
-
-// 🌐 Google OAuth2 Login
-router.get(
-  '/google',
-  passport.authenticate('google', { scope: ['profile', 'email'] })
-);
-
-// 🌐 Google OAuth2 Callback
-router.get(
-  '/google/callback',
-  passport.authenticate('google', { failureRedirect: '/login' }),
-  (req, res) => {
-    const { _id, role } = req.user;
-    const token = jwt.sign(
-      { userId: _id, role },
-      process.env.JWT_SECRET,
-      { expiresIn: '24h' }
-    );
-    res.redirect(`${process.env.FRONTEND_URL}/auth/callback?token=${token}`);
-  }
-);
 
 // 🔐 Local Login
 router.post('/login', async (req, res) => {

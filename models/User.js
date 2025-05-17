@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-//const bcrypt = require('bcryptjs');
 
 const userSchema = new mongoose.Schema({
   username: {
@@ -10,18 +9,11 @@ const userSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: function () {
-      return !this.googleId; // Password is required only if not using Google OAuth
-    }
-  },
-  googleId: {
-    type: String,
-    unique: true,
-    sparse: true
+    required: true // Always required now (since Google login is removed)
   },
   role: {
     type: String,
-    enum: ['admin', 'site_engineer', 'paying_authority', 'viewer'], // include 'admin'
+    enum: ['admin', 'site_engineer', 'paying_authority', 'viewer'],
     required: true
   },
   email: {
@@ -39,25 +31,23 @@ const userSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// 🔐 Hash password before saving (if modified and present)
-//userSchema.pre('save', async function (next) {
-  //if (!this.isModified('password') || !this.password) {
-    //return next();
-  //}
+// 🔐 Password hashing can be re-enabled later with bcrypt
+/*
+userSchema.pre('save', async function (next) {
+  if (!this.isModified('password') || !this.password) return next();
+  try {
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+*/
 
-  //try {
-    //const salt = await bcrypt.genSalt(10);
-    //this.password = await bcrypt.hash(this.password, salt);
-    //next();
-  //} catch (error) {
-    //next(error);
-  //}
-//});
-
-// 🔍 Plain-text comparison (no hashing)
+// 🔍 Plain-text password comparison (no hashing)
 userSchema.methods.comparePassword = function(candidatePassword) {
   return Promise.resolve(candidatePassword === this.password);
 };
 
 module.exports = mongoose.model('User', userSchema);
-

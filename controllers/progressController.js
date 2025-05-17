@@ -8,13 +8,19 @@ const path     = require('path');
 const MAX_PHOTOS = 10;
 const MAX_ZIP_MB  = 100;
 
-// Helper: zip files → Drive → return fileMeta
+// ✅ Helper: zip files → Drive → return fileMeta or null if no files
 async function zipAndUpload(files, date) {
   console.log('DEBUG in helper, received date:', date);
-  const photos = files.photos || [];
+  const photos = files?.photos || [];
+  const videos = files?.video || [];
+  const allFiles = [...photos, ...videos];
+
   if (photos.length > MAX_PHOTOS) {
     throw new Error(`Max ${MAX_PHOTOS} photos allowed`);
   }
+
+  // ✅ No files uploaded — skip ZIP creation
+  if (allFiles.length === 0) return null;
 
   const safeDate = date.replace(/:/g, '-');
   const zipName  = `progress_${safeDate}.zip`;
@@ -49,8 +55,8 @@ async function zipAndUpload(files, date) {
       }
     });
 
-    files.photos?.forEach(f => archive.append(f.buffer, { name: f.originalname }));
-    files.video?.forEach(f => archive.append(f.buffer, { name: f.originalname }));
+    photos.forEach(f => archive.append(f.buffer, { name: f.originalname }));
+    videos.forEach(f => archive.append(f.buffer, { name: f.originalname }));
     archive.finalize();
   });
 }
@@ -61,12 +67,12 @@ exports.createProgress = async (req, res) => {
     if (!date)        throw new Error('A date is required.');
     if (!description) throw new Error('A description is required.');
 
-    const zipMeta = await zipAndUpload(req.files, date);
+    const zipMeta = await zipAndUpload(req.files || {}, date);
 
     const prog = await Progress.create({
       date,
       description,
-      zip:        zipMeta,
+      zip:        zipMeta || undefined,
       uploadedBy: req.user._id,
       status:     'pending'
     });

@@ -1,0 +1,12 @@
+runtime: nodejs18
+env: flex
+
+automatic_scaling:
+  min_num_instances: 1
+  max_num_instances: 2
+
+env_variables:
+  MONGODB_URI: "mongodb+srv://hangaruser:Hangar%402025@hangercluster.pdiwfmo.mongodb.net/hangar_management?retryWrites=true&w=majority&appName=HangerCluster"
+  JWT_SECRET: "V9gA7Yz$eQ2#kR4wLt0!NpxCmJd@58UvZqXsTfM1Bh"
+  FRONTEND_URL: "https://www.iruvade.com"
+  NODE_ENV: "production"

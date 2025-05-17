@@ -9,34 +9,48 @@ const fileSchema = new mongoose.Schema({
 }, { _id: false });
 
 const progressSchema = new mongoose.Schema({
+  // 👇 NEW: Auto-incremented like Progress#1, Progress#2
+  progressID: {
+    type: String,
+    required: true,
+    unique: true
+  },
+
   date: {
     type: Date,
     required: true
   },
+
   description: {
     type: String,
     required: true
   },
+
   // ZIP archive containing up to 10 photos + one video
   zip: {
     type: fileSchema,
     required: true
   },
+
   uploadedBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
   },
+
   status: {
     type: String,
     enum: ['pending', 'approved', 'rejected'],
     default: 'pending'
   },
+
   approvedBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   },
+
   approvedAt: Date,
+
   comments: [{
     text: String,
     user: {
